@@ -149,7 +149,8 @@
 
 <script>
     let html5QrCode;
-    let studentAnswers = Array(10).fill('');
+    // Khởi tạo mảng 10 phần tử rỗng đại diện cho 10 câu hỏi
+    let studentAnswers = new Array(10).fill('');
 
     window.onload = function() {
         renderStudentQuestions();
@@ -327,23 +328,39 @@
         container.innerHTML = html;
     }
 
+    // SỬA LỖI: Ghi nhận đáp án chính xác và cập nhật giao diện chọn nút
     function selectAnswer(qNum, option) {
         studentAnswers[qNum - 1] = option;
         ['A','B','C','D'].forEach(opt => {
-            document.getElementById(`btn_${qNum}_${opt}`).classList.toggle('selected', opt === option);
+            const btn = document.getElementById(`btn_${qNum}_${opt}`);
+            if (btn) {
+                btn.classList.toggle('selected', opt === option);
+            }
         });
     }
 
+    // SỬA LỖI: Kiểm tra chặt chẽ đủ 10 câu trả lời chưa bị bỏ trống
     function generateStudentQR() {
         const name = document.getElementById('st-name').value.trim();
         const className = document.getElementById('st-class').value.trim();
-        if (!name || !className) { alert('Vui lòng điền đầy đủ Họ tên và Lớp!'); return; }
-        const ansStr = studentAnswers.join('');
-        if (ansStr.length < 10 || ansStr.includes('')) { alert('Em cần chọn đủ đáp án cho 10 câu!'); return; }
+        if (!name || !className) { 
+            alert('Vui lòng điền đầy đủ Họ tên và Lớp!'); 
+            return; 
+        }
 
+        // Đếm số câu đã hoàn thành
+        const answeredCount = studentAnswers.filter(ans => ans !== '').length;
+        if (answeredCount < 10) { 
+            alert(`Em mới chọn được ${answeredCount}/10 câu. Vui lòng chọn đủ đáp án cho tất cả 10 câu!`); 
+            return; 
+        }
+
+        const ansStr = studentAnswers.join('');
         const qrData = `MSV:${name}_${className}|Ans:${ansStr}`;
-        document.getElementById('qrcode').innerHTML = '';
-        new QRCode(document.getElementById('qrcode'), { text: qrData, width: 200, height: 200 });
+        
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: qrData, width: 200, height: 200 });
         document.getElementById('qr-string').innerText = `Mã QR của ${name} (${className}) đã sẵn sàng!`;
     }
 </script>
