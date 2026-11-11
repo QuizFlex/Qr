@@ -1,1 +1,406 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Trắc Nghiệm Thông Minh Quét Mã Zalo & Phiếu A4</title>
+    <!-- Thư viện mã QR và Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 850px; margin: 20px auto; padding: 20px; background-color: #f4f6f9; color: #333; }
+        .header { text-align: center; background: #0056b3; color: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .header h1 { margin: 0; font-size: 1.8rem; }
+        .copyright { font-size: 0.95rem; font-style: italic; color: #ffeb3b; margin-top: 8px; font-weight: bold; }
+        .nav-tabs { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+        .tab-btn { flex: 1; min-width: 180px; padding: 12px; font-weight: bold; font-size: 0.95rem; border: none; border-radius: 8px; cursor: pointer; background: #e2e8f0; color: #475569; transition: 0.2s; text-align: center; }
+        .tab-btn.active { background: #0056b3; color: white; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; color: #1e293b; }
+        input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
+        .btn { background-color: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; display: inline-block; }
+        .btn:hover { background-color: #059669; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        #reader { width: 100%; max-width: 450px; margin: 15px auto; border-radius: 8px; overflow: hidden; }
+        #qrcode { display: flex; justify-content: center; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: center; }
+        th { background: #e2e8f0; color: #1e293b; }
+        .option-group { display: flex; gap: 8px; margin-top: 5px; }
+        .opt-btn { flex: 1; padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .opt-btn.selected { background: #2563eb; color: white; border-color: #1d4ed8; }
+        
+        /* Cấu trúc thiết kế bản In Giấy A4 */
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 15px; }
+            .a4-sheet { border: 2px solid #000; padding: 20px; margin-bottom: 30px; page-break-after: always; box-sizing: border-box; font-family: Arial, sans-serif; }
+            .a4-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+            .a4-title { font-size: 16pt; font-weight: bold; text-align: center; margin-bottom: 15px; text-transform: uppercase; }
+            .a4-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+            .a4-question-box { border: 1px solid #94a3b8; padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; }
+            .circle-opt { display: inline-block; width: 26px; height: 26px; border: 2px solid #000; border-radius: 50%; text-align: center; line-height: 26px; font-weight: bold; margin-left: 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Hệ Thống Trắc Nghiệm Thông Minh Quét Mã Zalo & Phiếu A4</h1>
+    <div class="copyright">Biên soạn & Bản quyền: GV NGUYỄN THỊ KIM HOA - THCS Cần Đăng</div>
+</div>
+
+<!-- THANH CHUYỂN ĐỔI 3 CHẾ ĐỘ -->
+<div class="nav-tabs">
+    <button class="tab-btn active" id="tab1" onclick="switchMode('teacher')">📷 1. Quét Camera Chấm Điểm</button>
+    <button class="tab-btn" id="tab3" onclick="switchMode('print')">🖨️ 2. In Phiếu Giấy A4 (Học Sinh Không ĐT)</button>
+    <button class="tab-btn" id="tab2" onclick="switchMode('student')">📱 3. Học Sinh Làm Bài Có ĐT (Tạo QR)</button>
+</div>
+
+<!-- CHẾ ĐỘ 1: DÀNH CHO GIÁO VIÊN -->
+<div id="teacher-section">
+    <div class="card">
+        <h3>1. Cấu Hình Đáp Án Đề Thi</h3>
+        <div class="form-group">
+            <label for="correctAnswers">Đáp án đúng (Ví dụ: A B C D A D C B A D):</label>
+            <input type="text" id="correctAnswers" value="ABCDCDBADC" placeholder="Nhập chuỗi đáp án chuẩn 10 câu...">
+        </div>
+    </div>
+
+    <div class="card" style="text-align: center;">
+        <h3>2. Quét Mã QR Bài Làm (Giấy A4 hoặc Màn Hình Zalo)</h3>
+        <p style="color: #64748b; font-size: 0.9rem;">Cô có thể dùng Camera trực tiếp hoặc chọn ảnh chụp phiếu giấy A4 để chấm điểm:</p>
+        
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+            <button class="btn" onclick="startCamera()">📷 Mở Camera Trực Tiếp</button>
+            <button class="btn btn-danger" onclick="stopCamera()">⏹️ Tắt Camera</button>
+        </div>
+
+        <div style="margin-top: 10px; border-top: 1px dashed #cbd5e1; padding-top: 15px;">
+            <label for="qr-file-input" class="btn" style="background-color: #2563eb; cursor: pointer;">
+                📸 Hoặc Chụp Ảnh / Tải Ảnh Mã QR Để Quét
+            </label>
+            <input type="file" id="qr-file-input" accept="image/*" capture="environment" style="display: none;" onchange="scanImageFile(this)">
+        </div>
+
+        <div id="reader"></div>
+        <div id="last-scan-result" style="margin-top: 15px; font-weight: bold; font-size: 1.15rem; color: #059669;"></div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <h3>3. Bảng Điểm Lớp Học (Tự Động Lưu)</h3>
+            <div>
+                <button class="btn" onclick="exportToExcel()">📥 Tải Excel Bảng Điểm</button>
+                <button class="btn btn-danger" onclick="clearClassData()">🗑️ Xóa Lịch Sử</button>
+            </div>
+        </div>
+        <div style="max-height: 250px; overflow-y: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>STT</th>
+                        <th>Họ và Tên</th>
+                        <th>Lớp</th>
+                        <th>Số Câu Đúng</th>
+                        <th>Điểm Số</th>
+                        <th>Thời Gian Quét</th>
+                    </tr>
+                </thead>
+                <tbody id="class-score-body">
+                    <tr><td colspan="6" style="color: #94a3b8;">Chưa có dữ liệu học sinh nào được quét.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- CHẾ ĐỘ 2: IN PHIẾU BÀI LÀM GIẤY A4 -->
+<div id="print-section" style="display: none;">
+    <div class="card">
+        <h3>Tạo Phiếu Trả Lời Trắc Nghiệm Khổ A4 Cho Cả Lớp</h3>
+        <p style="color: #64748b; font-size: 0.9rem;">Nhập danh sách học sinh (mỗi em một dòng). Hệ thống sẽ tự động chèn Mã QR Định Danh cho từng em vào góc phiếu A4!</p>
+        <div class="form-group">
+            <label>Danh sách học sinh (Định dạng: Họ tên - Lớp):</label>
+            <textarea id="student-list-input" rows="6" placeholder="Nguyễn Văn A - 6A1&#10;Trần Thị B - 6A1&#10;Lê Văn C - 6A1"></textarea>
+        </div>
+        <button class="btn" onclick="generateA4Sheets()">📄 Tạo Xem Trước Phiếu Giấy A4 Có QR</button>
+        <button class="btn" style="background-color: #0284c7; margin-left: 8px;" onclick="window.print()">🖨️ In Ngay Ra Giấy A4</button>
+    </div>
+
+    <div id="print-area"></div>
+</div>
+
+<!-- CHẾ ĐỘ 2: DÀNH CHO HỌC SINH (LÀM BÀI VÀ TẠO QR ĐÁP ÁN) -->
+<div id="student-section" style="display: none;">
+    <div class="card">
+        <h3>Điền Thông Tin Học Sinh</h3>
+        <div class="form-group">
+            <label>Họ và tên học sinh:</label>
+            <input type="text" id="st-name" placeholder="Ví dụ: Nguyễn Văn A">
+        </div>
+        <div class="form-group">
+            <label>Lớp:</label>
+            <input type="text" id="st-class" placeholder="Ví dụ: 6A1">
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>Chọn Đáp Án Các Câu Hỏi</h3>
+        <div id="quiz-questions">
+            <!-- 10 Câu hỏi mẫu -->
+        </div>
+        <button class="btn" style="width: 100%; margin-top: 15px; font-size: 1.1rem;" onclick="generateStudentQR()">✨ Tạo Mã QR Đáp Án Để Chấm Điểm</button>
+    </div>
+
+    <div class="card" style="text-align: center;">
+        <h3>Mã QR Bài Làm Của Em</h3>
+        <p style="color: #64748b; font-size: 0.9rem;">Hãy giơ mã QR này lên trước camera của cô giáo để ghi nhận điểm số!</p>
+        <div id="qrcode"></div>
+        <div id="qr-string" style="margin-top: 10px; font-weight: bold; color: #2563eb;"></div>
+    </div>
+</div>
+
+
+<script>
+    let html5QrCode = null;
+    let studentAnswers = new Array(10).fill('');
+
+    window.onload = function() {
+        renderStudentQuestions();
+        renderClassTable();
+        document.getElementById('student-list-input').value = "Nguyễn Văn A - 6A1\nTrần Thị B - 6A1\nLê Văn C - 6A1";
+    };
+
+    function switchMode(mode) {
+        document.getElementById('tab1').classList.toggle('active', mode === 'teacher');
+        document.getElementById('tab2').classList.toggle('active', mode === 'student');
+        document.getElementById('tab3').classList.toggle('active', mode === 'print');
+
+        document.getElementById('teacher-section').style.display = (mode === 'teacher') ? 'block' : 'none';
+        document.getElementById('student-section').style.display = (mode === 'student') ? 'block' : 'none';
+        document.getElementById('print-section').style.display = (mode === 'print') ? 'block' : 'none';
+
+        if (mode !== 'teacher') stopCamera();
+    }
+
+    // --- SỬA LỖI: TẠO PHIẾU A4 BẰNG ẢNH QR CHUẨN IN ẤN ---
+    function generateA4Sheets() {
+        const rawText = document.getElementById('student-list-input').value.trim();
+        if (!rawText) { alert("Vui lòng nhập danh sách học sinh!"); return; }
+
+        const lines = rawText.split('\n');
+        const printArea = document.getElementById('print-area');
+        printArea.innerHTML = '';
+
+        lines.forEach((line, index) => {
+            if (!line.trim()) return;
+            const parts = line.split('-');
+            const name = parts[0] ? parts[0].trim() : `Học sinh ${index+1}`;
+            const className = parts[1] ? parts[1].trim() : '6A1';
+            const qrContent = `MSV:${name}_${className}`;
+            
+            // Sử dụng dịch vụ tạo ảnh QR chuẩn để hiển thị và in 100% thành công không bị lỗi canvas
+            const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(qrContent)}`;
+
+            const sheet = document.createElement('div');
+            sheet.className = 'a4-sheet';
+
+            let questionsHtml = '';
+            for (let q = 1; q <= 10; q++) {
+                questionsHtml += `
+                    <div class="a4-question-box">
+                        <span style="font-weight:bold;">Câu ${q}:</span>
+                        <div>
+                            <span class="circle-opt">A</span>
+                            <span class="circle-opt">B</span>
+                            <span class="circle-opt">C</span>
+                            <span class="circle-opt">D</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            sheet.innerHTML = `
+                <div class="a4-header">
+                    <div>
+                        <h4 style="margin:0;">TRƯỜNG THCS CẦN ĐĂNG</h4>
+                        <p style="margin:4px 0 0 0; font-size:11pt;">PHIẾU BÀI LÀM TRẮC NGHIỆM GIẤY</p>
+                        <p style="margin:4px 0 0 0; font-size:11pt;">Họ tên: <b>${name}</b> - Lớp: <b>${className}</b></p>
+                    </div>
+                    <div>
+                        <img src="${qrImageUrl}" alt="QR Mã Định Danh" width="90" height="90" style="display:block; border: 1px solid #ccc;" />
+                    </div>
+                </div>
+                <div class="a4-title">BÀI KIỂM TRA TRẮC NGHIỆM (10 CÂU)</div>
+                <p style="font-style:italic; font-size:10pt; margin-bottom:12px;">* Học sinh dùng bút chì/bút mực tô đen vào ô tròn đáp án em chọn.</p>
+                <div class="a4-grid">${questionsHtml}</div>
+            `;
+            printArea.appendChild(sheet);
+        });
+
+        alert("Đã tạo mẫu phiếu A4 kèm mã QR thành công! Bây giờ cô bấm nút '🖨️ In Ngay Ra Giấy A4' sẽ thấy mã QR hiện rõ nét.");
+    }
+
+    // --- LOGIC GIÁO VIÊN QUÉT CAMERA TRỰC TIẾP ---
+    function startCamera() {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
+        const qrConfig = { fps: 15, qrbox: { width: 250, height: 250 } };
+        html5QrCode.start({ facingMode: "environment" }, qrConfig, onScanSuccess)
+            .catch(err => {
+                alert("Không thể mở Camera trực tiếp: " + err + "\n👉 Cô hãy sử dụng nút 'Chụp Ảnh / Tải Ảnh Mã QR' ngay bên dưới nhé!");
+            });
+    }
+
+    function stopCamera() {
+        if (html5QrCode) {
+            html5QrCode.stop().then(() => {
+                console.log("Đã tắt camera.");
+            }).catch(err => console.log(err));
+        }
+    }
+
+    // --- LOGIC QUÉT QUA ẢNH CHỤP / TẢI ẢNH ---
+    function scanImageFile(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            Html5Qrcode.scanFile(file, true)
+                .then(decodedText => {
+                    onScanSuccess(decodedText);
+                })
+                .catch(err => {
+                    alert("❌ Không tìm thấy mã QR trong ảnh! Cô vui lòng chụp rõ nét góc chứa mã QR trên phiếu A4 nhé.");
+                });
+        }
+    }
+
+    function onScanSuccess(decodedText) {
+        try {
+            if (!decodedText.includes('MSV:')) return;
+            
+            let studentName = '', studentClass = '', studentAns = '';
+            const correctAns = document.getElementById('correctAnswers').value.toUpperCase().replace(/\s+/g, '');
+
+            if (decodedText.includes('|Ans:')) {
+                const parts = decodedText.split('|Ans:');
+                const info = parts[0].replace('MSV:', '').split('_');
+                studentName = info[0]; studentClass = info[1] || '6A1';
+                studentAns = parts[1].toUpperCase().trim();
+            } else {
+                const info = decodedText.replace('MSV:', '').split('_');
+                studentName = info[0]; studentClass = info[1] || '6A1';
+                studentAns = prompt(`Đã nhận diện phiếu A4 của em: ${studentName} (${studentClass})\nCô vui lòng nhập nhanh đáp án học sinh khoanh trên giấy (Ví dụ: ABCDCDBADC):`);
+                if (!studentAns) return;
+            }
+
+            let correctCount = 0;
+            let total = correctAns.length;
+            for (let i = 0; i < total; i++) {
+                if (studentAns[i] === correctAns[i]) correctCount++;
+            }
+            const score = ((correctCount / total) * 10).toFixed(1);
+            const timeStr = new Date().toLocaleTimeString('vi-VN');
+
+            saveScoreRecord(studentName, studentClass, correctCount, total, score, timeStr);
+            document.getElementById('last-scan-result').innerText = `✅ Đã chấm xong bài: ${studentName} (${studentClass}) - Điểm: ${score}!`;
+            
+            stopCamera();
+        } catch (e) {
+            console.log("Lỗi định dạng mã!");
+        }
+    }
+
+    function saveScoreRecord(name, className, correct, total, score, time) {
+        let records = JSON.parse(localStorage.getItem('zalo_quiz_scores') || '[]');
+        const existingIndex = records.findIndex(r => r.name === name && r.className === className);
+        if (existingIndex >= 0) {
+            records[existingIndex] = { name, className, correct: `${correct}/${total}`, score, time };
+        } else {
+            records.push({ name, className, correct: `${correct}/${total}`, score, time });
+        }
+        localStorage.setItem('zalo_quiz_scores', JSON.stringify(records));
+        renderClassTable();
+    }
+
+    function renderClassTable() {
+        let records = JSON.parse(localStorage.getItem('zalo_quiz_scores') || '[]');
+        const tbody = document.getElementById('class-score-body');
+        if (records.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" style="color: #94a3b8;">Chưa có dữ liệu học sinh nào được quét.</td></tr>';
+            return;
+        }
+        let html = '';
+        records.forEach((r, idx) => {
+            html += `<tr><td>${idx + 1}</td><td><b>${r.name}</b></td><td>${r.className}</td><td>${r.correct}</td><td style="color: #0056b3; font-weight: bold; font-size: 1.1rem;">${r.score}</td><td>${r.time}</td></tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    function exportToExcel() {
+        let records = JSON.parse(localStorage.getItem('zalo_quiz_scores') || '[]');
+        if (records.length === 0) { alert('Chưa có bảng điểm để xuất!'); return; }
+        const worksheet = XLSX.utils.json_to_sheet(records);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "BangDiemLop");
+        XLSX.writeFile(workbook, "Bang_Diem_Quet_Zalo.xlsx");
+    }
+
+    function clearClassData() {
+        if (confirm("Cô có chắc muốn xóa toàn bộ danh sách điểm đã quét không?")) {
+            localStorage.removeItem('zalo_quiz_scores');
+            renderClassTable();
+            document.getElementById('last-scan-result').innerText = '';
+        }
+    }
+
+    function renderStudentQuestions() {
+        const container = document.getElementById('quiz-questions');
+        let html = '';
+        for (let i = 1; i <= 10; i++) {
+            html += `<div style="margin-bottom: 12px;"><span style="font-weight: bold;">Câu ${i}:</span><div class="option-group">${['A','B','C','D'].map(opt => `<button type="button" class="opt-btn" id="btn_${i}_${opt}" onclick="selectAnswer(${i}, '${opt}')">${opt}</button>`).join('')}</div></div>`;
+        }
+        container.innerHTML = html;
+    }
+
+    function selectAnswer(qNum, option) {
+        studentAnswers[qNum - 1] = option;
+        ['A','B','C','D'].forEach(opt => {
+            const btn = document.getElementById(`btn_${qNum}_${opt}`);
+            if (btn) {
+                btn.classList.toggle('selected', opt === option);
+            }
+        });
+    }
+
+    function generateStudentQR() {
+        const name = document.getElementById('st-name').value.trim();
+        const className = document.getElementById('st-class').value.trim();
+        if (!name || !className) { 
+            alert('Vui lòng điền đầy đủ Họ tên và Lớp!'); 
+            return; 
+        }
+
+        const answeredCount = studentAnswers.filter(ans => ans !== '').length;
+        if (answeredCount < 10) { 
+            alert(`Em mới chọn được ${answeredCount}/10 câu. Vui lòng chọn đủ đáp án cho tất cả 10 câu!`); 
+            return; 
+        }
+
+        const ansStr = studentAnswers.join('');
+        const qrData = `MSV:${name}_${className}|Ans:${ansStr}`;
+        
+        const qrContainer = document.getElementById('qrcode');
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: qrData, width: 200, height: 200 });
+        document.getElementById('qr-string').innerText = `Mã QR của ${name} (${className}) đã sẵn sàng!`;
+    }
+</script>
+</body>
+</html>
 
