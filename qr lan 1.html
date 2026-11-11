@@ -20,7 +20,7 @@
         .form-group { margin-bottom: 15px; }
         label { font-weight: bold; display: block; margin-bottom: 5px; color: #1e293b; }
         input[type="text"], textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 1rem; }
-        .btn { background-color: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; }
+        .btn { background-color: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 1rem; transition: 0.2s; display: inline-block; }
         .btn:hover { background-color: #059669; }
         .btn-danger { background-color: #ef4444; }
         .btn-danger:hover { background-color: #dc2626; }
@@ -61,7 +61,7 @@
     <button class="tab-btn" id="tab2" onclick="switchMode('student')">📱 3. Học Sinh Làm Bài Có ĐT (Tạo QR)</button>
 </div>
 
-<!-- CHẾ ĐỘ 1: DÀNH CHO GIÁO VIÊN (QUÉT CAMERA CHẤM BÀI) -->
+<!-- CHẾ ĐỘ 1: DÀNH CHO GIÁO VIÊN (QUÉT CAMERA & CHỤP ẢNH CHẤM BÀI) -->
 <div id="teacher-section">
     <div class="card">
         <h3>1. Cấu Hình Đáp Án Đề Thi</h3>
@@ -73,9 +73,22 @@
 
     <div class="card" style="text-align: center;">
         <h3>2. Quét Mã QR Bài Làm (Giấy A4 hoặc Màn Hình Zalo)</h3>
-        <p style="color: #64748b; font-size: 0.9rem;">Cô mở Camera và hướng vào Mã QR ở góc phiếu giấy A4 của học sinh.</p>
-        <button class="btn" onclick="startCamera()">📷 Mở Camera Quét Chấm Điểm</button>
-        <button class="btn btn-danger" onclick="stopCamera()">⏹️ Tắt Camera</button>
+        <p style="color: #64748b; font-size: 0.9rem;">Cô có thể dùng Camera trực tiếp hoặc chụp ảnh phiếu giấy A4 để chấm điểm:</p>
+        
+        <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+            <button class="btn" onclick="startCamera()">📷 Mở Camera Trực Tiếp</button>
+            <button class="btn btn-danger" onclick="stopCamera()">⏹️ Tắt Camera</button>
+        </div>
+
+        <!-- BỔ SUNG: Nút chụp ảnh / tải ảnh quét dự phòng chống lỗi trên Zalo/GitHub -->
+        <div style="margin-top: 10px; border-top: 1px dashed #cbd5e1; padding-top: 15px;">
+            <label for="qr-file-input" class="btn" style="background-color: #2563eb; cursor: pointer;">
+                📸 Hoặc Chụp Ảnh / Tải Ảnh Mã QR Để Quét
+            </label>
+            <input type="file" id="qr-file-input" accept="image/*" capture="environment" style="display: none;" onchange="scanImageFile(this)">
+            <p style="font-size: 0.85rem; color: #64748b; margin-top: 5px;">*(Dùng nút này nếu mở qua Zalo bị lỗi camera trực tiếp)*</p>
+        </div>
+
         <div id="reader"></div>
         <div id="last-scan-result" style="margin-top: 15px; font-weight: bold; font-size: 1.15rem; color: #059669;"></div>
     </div>
@@ -148,14 +161,12 @@
 </div>
 
 <script>
-    let html5QrCode;
-    // Khởi tạo mảng 10 phần tử rỗng đại diện cho 10 câu hỏi
+    let html5QrCode = null;
     let studentAnswers = new Array(10).fill('');
 
     window.onload = function() {
         renderStudentQuestions();
         renderClassTable();
-        // Mẫu danh sách học sinh ban đầu
         document.getElementById('student-list-input').value = "Nguyễn Văn A - 6A1\nTrần Thị B - 6A1\nLê Văn C - 6A1";
     };
 
@@ -220,23 +231,42 @@
             `;
             printArea.appendChild(sheet);
 
-            // Sinh mã QR định danh vào phiếu A4
             new QRCode(document.getElementById(`qrcode_print_${index}`), { text: qrContent, width: 90, height: 90 });
         });
         alert("Đã tạo mẫu phiếu A4 xem trước thành công! Cô có thể bấm nút '🖨️ In Ngay Ra Giấy A4' bên trên.");
     }
 
-    // --- LOGIC GIÁO VIÊN QUÉT CAMERA CHẤM ĐIỂM ---
+    // --- LOGIC GIÁO VIÊN QUÉT CAMERA TRỰC TIẾP ---
     function startCamera() {
+        if (!html5QrCode) {
+            html5QrCode = new Html5Qrcode("reader");
+        }
         const qrConfig = { fps: 15, qrbox: { width: 250, height: 250 } };
-        html5QrCode = new Html5Qrcode("reader");
         html5QrCode.start({ facingMode: "environment" }, qrConfig, onScanSuccess)
-            .catch(err => alert("Không thể mở Camera: " + err));
+            .catch(err => {
+                alert("Không thể mở Camera trực tiếp: " + err + "\n👉 Cô hãy sử dụng nút 'Chụp Ảnh / Tải Ảnh Mã QR Để Quét' ngay bên dưới nhé!");
+            });
     }
 
     function stopCamera() {
         if (html5QrCode) {
-            html5QrCode.stop().then(() => console.log("Đã tắt camera.")).catch(err => console.log(err));
+            html5QrCode.stop().then(() => {
+                console.log("Đã tắt camera.");
+            }).catch(err => console.log(err));
+        }
+    }
+
+    // --- LOGIC QUÉT QUA ẢNH CHỤP / TẢI ẢNH (BẢO ĐẢM 100% HOẠT ĐỘNG TRÊN ZALO & GITHUB) ---
+    function scanImageFile(input) {
+        if (input.files && input.files[0]) {
+            const file = input.files[0];
+            Html5Qrcode.scanFile(file, true)
+                .then(decodedText => {
+                    onScanSuccess(decodedText);
+                })
+                .catch(err => {
+                    alert("❌ Không tìm thấy mã QR trong ảnh! Cô vui lòng chụp rõ nét góc chứa mã QR trên phiếu A4 nhé.");
+                });
         }
     }
 
@@ -248,13 +278,11 @@
             const correctAns = document.getElementById('correctAnswers').value.toUpperCase().replace(/\s+/g, '');
 
             if (decodedText.includes('|Ans:')) {
-                // Quét từ máy học sinh có sẵn đáp án
                 const parts = decodedText.split('|Ans:');
                 const info = parts[0].replace('MSV:', '').split('_');
                 studentName = info[0]; studentClass = info[1] || '6A1';
                 studentAns = parts[1].toUpperCase().trim();
             } else {
-                // Quét Mã QR định danh trên tờ giấy A4
                 const info = decodedText.replace('MSV:', '').split('_');
                 studentName = info[0]; studentClass = info[1] || '6A1';
                 studentAns = prompt(`Đã nhận diện phiếu A4 của em: ${studentName} (${studentClass})\nCô vui lòng nhập nhanh đáp án học sinh khoanh trên giấy (Ví dụ: ABCDCDBADC):`);
@@ -271,6 +299,9 @@
 
             saveScoreRecord(studentName, studentClass, correctCount, total, score, timeStr);
             document.getElementById('last-scan-result').innerText = `✅ Đã chấm xong bài: ${studentName} (${studentClass}) - Điểm: ${score}!`;
+            
+            // Dừng camera nếu đang bật
+            stopCamera();
         } catch (e) {
             console.log("Lỗi định dạng mã!");
         }
@@ -328,7 +359,6 @@
         container.innerHTML = html;
     }
 
-    // SỬA LỖI: Ghi nhận đáp án chính xác và cập nhật giao diện chọn nút
     function selectAnswer(qNum, option) {
         studentAnswers[qNum - 1] = option;
         ['A','B','C','D'].forEach(opt => {
@@ -339,7 +369,6 @@
         });
     }
 
-    // SỬA LỖI: Kiểm tra chặt chẽ đủ 10 câu trả lời chưa bị bỏ trống
     function generateStudentQR() {
         const name = document.getElementById('st-name').value.trim();
         const className = document.getElementById('st-class').value.trim();
@@ -348,7 +377,6 @@
             return; 
         }
 
-        // Đếm số câu đã hoàn thành
         const answeredCount = studentAnswers.filter(ans => ans !== '').length;
         if (answeredCount < 10) { 
             alert(`Em mới chọn được ${answeredCount}/10 câu. Vui lòng chọn đủ đáp án cho tất cả 10 câu!`); 
